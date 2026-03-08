@@ -203,12 +203,18 @@ def on_answer(data):
         }, room=code)
         if not r["winner"]:
             def next_q():
-                time.sleep(2)
+                socketio.sleep(2)
                 if code in game_rooms and game_rooms[code]["active"]:
+                # if code in game_rooms and game_rooms[code]["active"]:
                     game_rooms[code]["current_question"] = generate_question()
                     game_rooms[code]["round_locked"] = False
-                    socketio.emit('new_question', {"question": game_rooms[code]["current_question"]}, room=code)
-            threading.Thread(target=next_q, daemon=True).start()
+                    socketio.emit(
+                        'new_question',
+                        {"question": game_rooms[code]["current_question"]},
+                        room=code
+                        )
+            # threading.Thread(target=next_q, daemon=True).start()
+            socketio.start_background_task(next_q)
     else:
         emit('answer_result', {'correct': False, 'too_slow': False})
 
