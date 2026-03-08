@@ -2,11 +2,15 @@ from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO, emit, join_room
 import random
 import string
+import time
+import threading
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tugofwar_math_secret_2024'
+# socketio = SocketIO(app, cors_allowed_origins="*")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
+# Each room is a completely independent game session
 game_rooms = {}
 
 def generate_room_code():
@@ -79,22 +83,34 @@ def get_room(code):
     if code not in game_rooms:
         return jsonify({"error": "Room not found"}), 404
     r = game_rooms[code]
-    return jsonify({
-        "exists": True,
-        "active": r["active"],
-        "team1_name": r["team1_name"],
-        "team2_name": r["team2_name"],
-        "player_count": len(r["players"])
-    })
+    return jsonify({"exists": True, "active": r["active"],
+                    "team1_name": r["team1_name"], "team2_name": r["team2_name"],
+                    "player_count": len(r["players"])})
 
+# @app.route('/api/start/<code>', methods=['POST'])
+# def start_game(code):
+#     code = code.upper()
+#     if code not in game_rooms:
+#         return jsonify({"error": "Room not found"}), 404
+#     r = game_rooms[code]
+#     r.update({"active": True, "winner": None, "team1_score": 0,
+#                "team2_score": 0, "rope_position": 0, "round_locked": False,
+#                "current_question": generate_question()})
+#     socketio.emit('game_update', room_state(r), room=code)
+#     return jsonify({"status": "started"})
 @app.route('/api/start/<code>', methods=['POST'])
 def start_game(code):
     code = code.upper()
+
     if code not in game_rooms:
         return jsonify({"error": "Room not found"}), 404
+
     r = game_rooms[code]
+
+    # Require minimum 2 players
     if len(r["players"]) < 2:
         return jsonify({"error": "Need at least 2 players"}), 400
+
     r.update({
         "active": True,
         "winner": None,
@@ -104,7 +120,9 @@ def start_game(code):
         "round_locked": False,
         "current_question": generate_question()
     })
+
     socketio.emit('game_update', room_state(r), room=code)
+
     return jsonify({"status": "started"})
 
 # ── SocketIO ──────────────────────────────────────────────────
@@ -121,20 +139,12 @@ def on_join(data):
     sid = request.sid
     join_room(code)
     r["players"][sid] = {"name": name, "team": team, "score": 0}
-
-    # FIX: Only update team name if it's still default, don't overwrite
-    if team == 1 and r["team1_name"] == "Team 1":
-        r["team1_name"] = name
-    elif team == 2 and r["team2_name"] == "Team 2":
-        r["team2_name"] = name
-
-    # Always use the joining player's name as their team label
     if team == 1:
         r["team1_name"] = name
     else:
         r["team2_name"] = name
-
     emit('joined', {"room_code": code, "name": name, "team": team, "state": room_state(r)})
+
     socketio.emit('player_joined', {
         "name": name,
         "team": team,
@@ -148,50 +158,40 @@ def on_join(data):
         r["active"] = True
         r["current_question"] = generate_question()
         r["round_locked"] = False
-        socketio.emit('game_update', room_state(r), room=code)
 
+        socketio.emit('game_update', room_state(r), room=code)
 
 @socketio.on('submit_answer')
 def on_answer(data):
     code = data.get('room_code', '').upper()
     answer = data.get('answer')
     sid = request.sid
-
     if code not in game_rooms:
         return
     r = game_rooms[code]
-
     if not r["active"] or r["round_locked"]:
         emit('answer_result', {'correct': False, 'too_slow': True})
         return
-
     player = r["players"].get(sid)
     if not player:
         return
-
     correct = int(answer) == r["current_question"]["answer"]
-
     if correct:
-        # Lock immediately to prevent double answers
         r["round_locked"] = True
         team = player["team"]
         player["score"] += 1
-
         if team == 1:
             r["team1_score"] += 1
             r["rope_position"] = max(-5, r["rope_position"] - 1)
         else:
             r["team2_score"] += 1
             r["rope_position"] = min(5, r["rope_position"] + 1)
-
-        # Check win condition
         if r["rope_position"] <= -5:
             r["winner"] = r["team1_name"]
             r["active"] = False
         elif r["rope_position"] >= 5:
             r["winner"] = r["team2_name"]
             r["active"] = False
-
         socketio.emit('round_result', {
             "winner_name": player["name"],
             "winner_team": team,
@@ -201,70 +201,32 @@ def on_answer(data):
             "game_winner": r["winner"],
             "correct_answer": r["current_question"]["answer"],
         }, room=code)
-
-        # FIX: Only queue next question if game is still going
         if not r["winner"]:
-            def next_q(room_code=code):
-                # BUG FIX: Use socketio.sleep (eventlet-compatible), capture code in closure
+            def next_q():
                 socketio.sleep(2)
-                # Double-check room still exists and is active before proceeding
-                if room_code not in game_rooms:
-                    return
-                room = game_rooms[room_code]
-                if not room["active"] or room["winner"]:
-                    return
-                # Generate new question and unlock
-                room["current_question"] = generate_question()
-                room["round_locked"] = False
-                socketio.emit(
-                    'new_question',
-                    {"question": room["current_question"]},
-                    room=room_code
-                )
+                if code in game_rooms and game_rooms[code]["active"]:
+                # if code in game_rooms and game_rooms[code]["active"]:
+                    game_rooms[code]["current_question"] = generate_question()
+                    game_rooms[code]["round_locked"] = False
+                    socketio.emit(
+                        'new_question',
+                        {"question": game_rooms[code]["current_question"]},
+                        room=code
+                        )
+            # threading.Thread(target=next_q, daemon=True).start()
             socketio.start_background_task(next_q)
     else:
         emit('answer_result', {'correct': False, 'too_slow': False})
 
-
-@socketio.on('rematch')
-def on_rematch(data):
-    code = data.get('room_code', '').upper()
-    if code not in game_rooms:
-        return
-    r = game_rooms[code]
-    r.update({
-        "active": True,
-        "winner": None,
-        "team1_score": 0,
-        "team2_score": 0,
-        "rope_position": 0,
-        "round_locked": False,
-        "current_question": generate_question()
-    })
-    socketio.emit('game_update', room_state(r), room=code)
-
-
 @socketio.on('disconnect')
 def on_disconnect():
     sid = request.sid
-    for code, r in list(game_rooms.items()):
+    for code, r in game_rooms.items():
         if sid in r["players"]:
             name = r["players"][sid]["name"]
             del r["players"][sid]
-            # If game was active and now too few players, pause it
-            if r["active"] and len(r["players"]) < 2:
-                r["active"] = False
-                r["round_locked"] = False
-                socketio.emit('game_paused', {
-                    "message": f"{name} left the game. Waiting for players..."
-                }, room=code)
-            else:
-                socketio.emit('player_left', {
-                    "name": name,
-                    "player_count": len(r["players"])
-                }, room=code)
+            socketio.emit('player_left', {"name": name, "player_count": len(r["players"])}, room=code)
             break
-
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)
