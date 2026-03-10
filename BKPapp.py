@@ -5,15 +5,7 @@ import string
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tugofwar_math_secret_2024'
-socketio = SocketIO(
-    app,
-    cors_allowed_origins="*",
-    async_mode="eventlet",
-    logger=False,
-    engineio_logger=False,
-    ping_timeout=60,
-    ping_interval=25,
-)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 game_rooms = {}
 
@@ -130,7 +122,13 @@ def on_join(data):
     join_room(code)
     r["players"][sid] = {"name": name, "team": team, "score": 0}
 
-    # Set team name to player name
+    # FIX: Only update team name if it's still default, don't overwrite
+    if team == 1 and r["team1_name"] == "Team 1":
+        r["team1_name"] = name
+    elif team == 2 and r["team2_name"] == "Team 2":
+        r["team2_name"] = name
+
+    # Always use the joining player's name as their team label
     if team == 1:
         r["team1_name"] = name
     else:

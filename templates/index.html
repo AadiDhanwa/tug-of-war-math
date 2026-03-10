@@ -834,7 +834,14 @@
 </div><!-- /page -->
 
 <script>
-const socket = io();
+const socket = io({
+  transports: ['polling', 'websocket'],  // polling first for mobile HTTP compatibility
+  upgrade: true,
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000,
+  timeout: 10000,
+});
 let myRoom = null;
 let myName = null;
 let myTeam = 1;
@@ -842,7 +849,20 @@ let joinTeam = 2;
 let currentQuestion = null;
 let answered = false;
 
-// ── Team selection ─────────────────────────────────────────
+socket.on('connect', () => {
+  console.log('Socket connected:', socket.id);
+});
+
+socket.on('connect_error', (err) => {
+  console.error('Connection error:', err);
+  showToast('Connection failed. Check internet!', 'bad');
+});
+
+socket.on('disconnect', (reason) => {
+  showToast('Disconnected: ' + reason, 'bad');
+});
+
+
 function selectTeam(t) {
   myTeam = t;
   document.getElementById('team-btn-1').className = 'team-btn' + (t===1?' active-red':'');
@@ -877,20 +897,51 @@ async function joinRoom() {
   const code = document.getElementById('join-code').value.trim().toUpperCase();
   if (!name) { showToast('Enter your name!', 'bad'); return; }
   if (!code) { showToast('Enter room code!', 'bad'); return; }
+  if (code.length !== 6) { showToast('Code must be 6 characters!', 'bad'); return; }
 
-  const res = await fetch(`/api/room/${code}`);
-  if (!res.ok) { showToast('Room not found!', 'bad'); return; }
+  try {
+    const res = await fetch(`/api/room/${code}`);
+    const data = await res.json();
+    if (!res.ok || data.error) { showToast(data.error || 'Room not found!', 'bad'); return; }
 
-  myRoom = code;
-  myName = name;
-  myTeam = joinTeam;
-  socket.emit('join_room', {room_code: code, name, team: joinTeam});
+    myRoom = code;
+    myName = name;
+    myTeam = joinTeam;
+    showToast('Joining room...', 'info');
+    socket.emit('join_room', {room_code: code, name, team: joinTeam});
+  } catch (e) {
+    showToast('Connection error. Try again!', 'bad');
+  }
 }
 
 function copyCode() {
-  if (myRoom) {
-    navigator.clipboard.writeText(myRoom).then(() => showToast('Copied!', 'info'));
+  if (!myRoom) return;
+  // Modern clipboard API (HTTPS only)
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(myRoom)
+      .then(() => showToast('📋 Copied!', 'info'))
+      .catch(() => fallbackCopy(myRoom));
+  } else {
+    fallbackCopy(myRoom);
   }
+}
+
+function fallbackCopy(text) {
+  // Works on HTTP + mobile browsers
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px;';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, 99999); // For mobile
+  try {
+    document.execCommand('copy');
+    showToast('📋 Copied!', 'info');
+  } catch (e) {
+    showToast('Long press the code to copy', 'info');
+  }
+  document.body.removeChild(ta);
 }
 
 // ── Socket events ──────────────────────────────────────────
@@ -899,12 +950,28 @@ socket.on('joined', (data) => {
   myTeam = data.team;
   if (data.state.active) {
     startGameUI(data.state);
+  } else {
+    // Player 2 joined but game not started yet — show waiting screen
+    document.getElementById('lobby-create').style.display = 'none';
+    document.getElementById('lobby-waiting').style.display = 'block';
+    document.getElementById('display-room-code').textContent = myRoom;
+    document.getElementById('waiting-status').textContent =
+      `${data.state.player_count} player(s) in room — waiting to start...`;
   }
 });
 
 socket.on('player_joined', (data) => {
-  document.getElementById('waiting-status').textContent =
-    `${data.player_count} player(s) in room — ${data.team1_name} vs ${data.team2_name}`;
+  // Update waiting status text
+  const statusEl = document.getElementById('waiting-status');
+  if (statusEl) {
+    statusEl.textContent =
+      `${data.player_count} player(s) in room — ${data.team1_name} vs ${data.team2_name}`;
+  }
+  // If we were paused mid-game, remove pause overlay
+  document.getElementById('pause-overlay').classList.remove('show');
+  // Update player count label in game screen
+  const countLabel = document.getElementById('player-count-label');
+  if (countLabel) countLabel.textContent = `👥 ${data.player_count} players`;
 });
 
 socket.on('game_update', (state) => {
@@ -969,14 +1036,6 @@ socket.on('answer_result', (data) => {
 socket.on('game_paused', (data) => {
   document.getElementById('pause-message').textContent = data.message;
   document.getElementById('pause-overlay').classList.add('show');
-});
-
-socket.on('player_joined', (data) => {
-  // If we were paused and now have 2+ players again
-  document.getElementById('pause-overlay').classList.remove('show');
-  document.getElementById('waiting-status').textContent =
-    `${data.player_count} player(s) — ${data.team1_name} vs ${data.team2_name}`;
-  document.getElementById('player-count-label').textContent = `👥 ${data.player_count} players`;
 });
 
 socket.on('player_left', (data) => {
