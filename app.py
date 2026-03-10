@@ -52,6 +52,7 @@ def new_room():
         "active": False,
         "winner": None,
         "round_locked": False,
+        "wrong_answers": set(),
     }
 
 def room_state(room):
@@ -176,6 +177,7 @@ def on_answer(data):
     if correct:
         # Lock immediately to prevent double answers
         r["round_locked"] = True
+        r["wrong_answers"] = set()  # reset for next round
         team = player["team"]
         player["score"] += 1
 
@@ -215,9 +217,9 @@ def on_answer(data):
                 room = game_rooms[room_code]
                 if not room["active"] or room["winner"]:
                     return
-                # Generate new question and unlock
                 room["current_question"] = generate_question()
                 room["round_locked"] = False
+                room["wrong_answers"] = set()
                 socketio.emit(
                     'new_question',
                     {"question": room["current_question"]},
@@ -225,7 +227,31 @@ def on_answer(data):
                 )
             socketio.start_background_task(next_q)
     else:
+        r["wrong_answers"].add(sid)
         emit('answer_result', {'correct': False, 'too_slow': False})
+
+        # If all active players have answered wrong → skip question
+        active_sids = set(r["players"].keys())
+        if r["wrong_answers"] >= active_sids:
+            r["round_locked"] = True
+            r["wrong_answers"] = set()
+            socketio.emit('question_skipped', {
+                "correct_answer": r["current_question"]["answer"],
+                "message": "Both players got it wrong! Skipping..."
+            }, room=code)
+
+            def skip_q(room_code=code):
+                socketio.sleep(2)
+                if room_code not in game_rooms:
+                    return
+                room = game_rooms[room_code]
+                if not room["active"] or room["winner"]:
+                    return
+                room["current_question"] = generate_question()
+                room["round_locked"] = False
+                room["wrong_answers"] = set()
+                socketio.emit('new_question', {"question": room["current_question"]}, room=room_code)
+            socketio.start_background_task(skip_q)
 
 
 @socketio.on('rematch')
@@ -241,6 +267,7 @@ def on_rematch(data):
         "team2_score": 0,
         "rope_position": 0,
         "round_locked": False,
+        "wrong_answers": set(),
         "current_question": generate_question()
     })
     socketio.emit('game_update', room_state(r), room=code)

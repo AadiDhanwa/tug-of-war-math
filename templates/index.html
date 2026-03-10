@@ -1024,6 +1024,27 @@ socket.on('new_question', (data) => {
   answered = false;
 });
 
+socket.on('question_skipped', (data) => {
+  // Show the correct answer briefly before skipping
+  const grid = document.getElementById('options-grid');
+  grid.classList.add('options-locked');
+  Array.from(grid.children).forEach(btn => {
+    if (parseInt(btn.dataset.value) === data.correct_answer) {
+      btn.classList.add('reveal-correct');
+    }
+  });
+  showToast(`😅 Both wrong! Answer was ${data.correct_answer} — Skipping...`, 'info');
+
+  // Show countdown bar
+  const bar = document.getElementById('countdown-bar');
+  const fill = document.getElementById('countdown-fill');
+  bar.classList.add('show');
+  fill.style.animation = 'none';
+  void fill.offsetWidth;
+  fill.style.animation = 'countdown-anim 2s linear';
+  setTimeout(() => bar.classList.remove('show'), 2100);
+});
+
 socket.on('answer_result', (data) => {
   if (data.too_slow) {
     showToast('⏱ Too slow!', 'bad');
