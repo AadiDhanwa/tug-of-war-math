@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/>
+<title>Game — MathBattle</title>
+<link rel="stylesheet" href="/static/shared.css"/>
+<style>
+body{display:flex;flex-direction:column;min-height:100vh;padding:.75rem;gap:.75rem;overflow:hidden;}
+.game-wrap{display:flex;flex-direction:column;gap:.75rem;max-width:900px;margin:0 auto;width:100%;flex:1;}
+
+/* Status bar */
+.status-bar{display:flex;align-items:center;justify-content:space-between;padding:.5rem .85rem;background:var(--card);border:1px solid var(--border);border-radius:10px;font-size:.65rem;color:var(--muted);}
+.conn-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px;transition:background .3s;}
+.conn-dot.connected{background:var(--green);box-shadow:0 0 6px var(--green);}
+.conn-dot.disconnected{background:var(--red);animation:pdot 1s infinite;}
+.conn-dot.connecting{background:var(--yellow);animation:pdot .8s infinite;}
+@keyframes pdot{0%,100%{opacity:1;}50%{opacity:.4;}}
+.my-badge{padding:.2rem .65rem;border-radius:6px;font-family:'Bungee',cursive;font-size:.7rem;}
+.my-badge.red{background:rgba(255,45,85,.15);color:var(--red);border:1px solid rgba(255,45,85,.3);}
+.my-badge.blue{background:rgba(0,170,255,.15);color:var(--blue);border:1px solid rgba(0,170,255,.3);}
+
+/* Scoreboard */
+.scoreboard{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:.75rem;padding:.85rem 1.25rem;background:var(--card);border:1px solid var(--border);border-radius:16px;}
+.score-team{display:flex;flex-direction:column;gap:.2rem;}
+.score-team.t1{align-items:flex-start;}
+.score-team.t2{align-items:flex-end;}
+.team-label{font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;opacity:.4;}
+.team-name{font-family:'Bungee',cursive;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;}
+.t1 .team-name{color:var(--red);}
+.t2 .team-name{color:var(--blue);}
+.score-val{font-family:'Bungee',cursive;font-size:2.2rem;line-height:1;}
+.t1 .score-val{color:var(--red);text-shadow:0 0 20px rgba(255,45,85,.4);}
+.t2 .score-val{color:var(--blue);text-shadow:0 0 20px rgba(0,170,255,.4);}
+.vs{font-family:'Bungee',cursive;font-size:1.3rem;color:rgba(255,255,255,.2);}
+
+/* Rope */
+.rope-arena{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.25rem;position:relative;overflow:hidden;}
+.rope-arena::before{content:'PULL!';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Bungee Shade',cursive;font-size:4rem;color:rgba(255,255,255,.02);pointer-events:none;white-space:nowrap;}
+.rope-track{position:relative;height:56px;display:flex;align-items:center;}
+.zone{position:absolute;top:0;bottom:0;width:20%;border-radius:6px;opacity:.1;}
+.zone-red{left:0;background:var(--red);}
+.zone-blue{right:0;background:var(--blue);}
+.rope-line{position:absolute;left:0;right:0;top:50%;height:4px;transform:translateY(-50%);background:repeating-linear-gradient(90deg,#5a3a1a,#5a3a1a 8px,#8b5e2a 8px,#8b5e2a 16px);border-radius:2px;}
+.center-mark{position:absolute;left:50%;top:10%;bottom:10%;width:2px;background:rgba(255,230,0,.4);transform:translateX(-50%);}
+.rope-knot{position:absolute;top:50%;width:36px;height:36px;transform:translate(-50%,-50%);transition:left .6s cubic-bezier(.34,1.56,.64,1);z-index:2;filter:drop-shadow(0 0 8px rgba(255,230,0,.5));font-size:26px;display:flex;align-items:center;justify-content:center;}
+.rope-labels{display:flex;justify-content:space-between;margin-top:.6rem;font-size:.6rem;letter-spacing:.08em;color:rgba(255,255,255,.3);}
+.rope-labels span:first-child{color:rgba(255,45,85,.6);}
+.rope-labels span:last-child{color:rgba(0,170,255,.6);}
+
+/* Timer bars */
+.timer-bar{height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;margin-top:.6rem;}
+.timer-fill{height:100%;width:100%;background:linear-gradient(90deg,var(--green),var(--yellow),var(--red));}
+.timer-fill.run{animation:drain var(--dur,20s) linear forwards;}
+@keyframes drain{from{width:100%;}to{width:0%;}}
+.skip-bar{height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;display:none;margin-top:4px;}
+.skip-bar.show{display:block;}
+.skip-fill{height:100%;background:linear-gradient(90deg,var(--yellow),#ff9500);animation:drain 2s linear;}
+
+/* Question */
+.question-section{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;flex:1;display:flex;flex-direction:column;gap:1.1rem;text-align:center;}
+.q-header{display:flex;align-items:center;justify-content:space-between;}
+.q-label{font-size:.6rem;letter-spacing:.25em;color:rgba(255,255,255,.25);text-transform:uppercase;}
+.diff-badge{font-size:.6rem;padding:.2rem .6rem;border-radius:20px;font-family:'Bungee',cursive;}
+.diff-badge.easy{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.2);}
+.diff-badge.medium{background:rgba(255,230,0,.1);color:var(--yellow);border:1px solid rgba(255,230,0,.2);}
+.diff-badge.hard{background:rgba(255,45,85,.1);color:var(--red);border:1px solid rgba(255,45,85,.2);}
+.question-text{font-family:'Bungee',cursive;font-size:clamp(2rem,6vw,3rem);color:var(--yellow);text-shadow:0 0 40px rgba(255,230,0,.3);animation:qin .4s cubic-bezier(.34,1.56,.64,1);}
+@keyframes qin{from{transform:scale(.7);opacity:0;}to{transform:scale(1);opacity:1;}}
+.options-grid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;}
+.opt{padding:.9rem;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:#fff;font-family:'Bungee',cursive;font-size:1.3rem;cursor:pointer;transition:all .15s;min-height:60px;touch-action:manipulation;}
+.opt:hover{background:rgba(255,230,0,.08);border-color:rgba(255,230,0,.4);transform:translateY(-2px);}
+.opt:active{transform:scale(.97);}
+.opt.correct{background:rgba(0,255,136,.15);border-color:var(--green);color:var(--green);animation:flash .4s;}
+.opt.wrong{background:rgba(255,45,85,.15);border-color:var(--red);color:var(--red);animation:shake .3s;}
+.opt.reveal{background:rgba(0,255,136,.08);border-color:rgba(0,255,136,.4);color:var(--green);}
+.options-locked .opt:not(.correct):not(.reveal){opacity:.35;pointer-events:none;}
+@keyframes flash{0%,100%{transform:scale(1);}50%{transform:scale(1.06);}}
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-6px);}75%{transform:translateX(6px);}}
+
+/* History strip */
+.history-strip{display:flex;gap:.4rem;overflow-x:auto;padding:.1rem 0;scrollbar-width:none;}
+.history-strip::-webkit-scrollbar{display:none;}
+.h-chip{flex-shrink:0;font-size:.6rem;padding:.2rem .55rem;border-radius:20px;white-space:nowrap;font-family:'Space Mono',monospace;opacity:.7;}
+.h-chip.t1{background:rgba(255,45,85,.12);color:var(--red);border:1px solid rgba(255,45,85,.2);}
+.h-chip.t2{background:rgba(0,170,255,.12);color:var(--blue);border:1px solid rgba(0,170,255,.2);}
+
+/* Flash overlay */
+.round-flash{position:fixed;inset:0;pointer-events:none;z-index:400;opacity:0;transition:opacity .1s;}
+.round-flash.red{background:rgba(255,45,85,.12);}
+.round-flash.blue{background:rgba(0,170,255,.12);}
+.round-flash.on{opacity:1;}
+
+/* Pause overlay */
+.pause-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,15,.88);backdrop-filter:blur(8px);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:1.25rem;text-align:center;padding:2rem;}
+.pause-overlay.show{display:flex;}
+
+/* Winner overlay */
+.winner-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,15,.93);backdrop-filter:blur(12px);z-index:600;align-items:center;justify-content:center;flex-direction:column;gap:1rem;text-align:center;padding:2rem;}
+.winner-overlay.show{display:flex;}
+.confetti-bg{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+.confetti-p{position:absolute;width:8px;height:8px;border-radius:2px;animation:cfall linear infinite;}
+@keyframes cfall{0%{transform:translateY(-20px) rotate(0deg);opacity:1;}100%{transform:translateY(110vh) rotate(720deg);opacity:0;}}
+.winner-crown{font-size:4rem;animation:crown .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes crown{from{transform:scale(0) rotate(-20deg);}to{transform:scale(1) rotate(0deg);}}
+.winner-name{font-family:'Bungee Shade',cursive;font-size:clamp(2rem,8vw,4rem);background:linear-gradient(135deg,var(--yellow),#ff9500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.winner-sub{font-size:.7rem;letter-spacing:.3em;color:var(--muted);text-transform:uppercase;}
+.game-summary{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:.85rem 1.25rem;text-align:left;width:100%;max-width:340px;max-height:160px;overflow-y:auto;}
+.game-summary h3{font-family:'Bungee',cursive;font-size:.7rem;color:var(--muted);margin-bottom:.5rem;letter-spacing:.1em;}
+.summary-row{font-size:.7rem;padding:.22rem 0;border-bottom:1px solid rgba(255,255,255,.04);display:flex;justify-content:space-between;gap:.5rem;}
+.summary-q{color:var(--muted);flex:1;}
+.summary-by.t1{color:var(--red);font-weight:700;}
+.summary-by.t2{color:var(--blue);font-weight:700;}
+</style>
+</head>
+<body>
+<div class="page game-wrap">
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div><span class="conn-dot connecting" id="conn-dot"></span>ROOM: <strong id="room-code-label" style="color:var(--yellow);">---</strong></div>
+    <div class="my-badge red" id="my-badge">YOU: ---</div>
+    <div id="player-count">👥 —</div>
+  </div>
+
+  <!-- Scoreboard -->
+  <div class="scoreboard">
+    <div class="score-team t1">
+      <div class="team-label">Team 1</div>
+      <div class="team-name" id="t1-name">---</div>
+      <div class="score-val" id="t1-score">0</div>
+    </div>
+    <div class="vs">VS</div>
+    <div class="score-team t2">
+      <div class="team-label">Team 2</div>
+      <div class="team-name" id="t2-name">---</div>
+      <div class="score-val" id="t2-score">0</div>
+    </div>
+  </div>
+
+  <!-- Rope -->
+  <div class="rope-arena">
+    <div class="rope-track">
+      <div class="zone zone-red"></div>
+      <div class="zone zone-blue"></div>
+      <div class="rope-line"></div>
+      <div class="center-mark"></div>
+      <div class="rope-knot" id="knot" style="left:50%;">🔴</div>
+    </div>
+    <div class="rope-labels"><span>◀ TEAM 1 WINS</span><span>CENTER</span><span>TEAM 2 WINS ▶</span></div>
+    <div class="timer-bar"><div class="timer-fill" id="timer-fill"></div></div>
+    <div class="skip-bar" id="skip-bar"><div class="skip-fill"></div></div>
+  </div>
+
+  <!-- Question -->
+  <div class="question-section">
+    <div class="q-header">
+      <div class="q-label">⚡ ANSWER FIRST TO PULL ⚡</div>
+      <div class="diff-badge medium" id="diff-badge">MEDIUM</div>
+    </div>
+    <div class="question-text" id="question-text">?</div>
+    <div class="options-grid" id="options-grid">
+      <button class="opt">?</button><button class="opt">?</button>
+      <button class="opt">?</button><button class="opt">?</button>
+    </div>
+    <div class="history-strip" id="history-strip"></div>
+  </div>
+</div>
+
+<!-- Pause overlay -->
+<div class="pause-overlay" id="pause-overlay">
+  <div style="font-size:3rem;">⏸️</div>
+  <h2 style="font-family:'Bungee',cursive;color:var(--yellow);">GAME PAUSED</h2>
+  <p style="color:var(--muted);" id="pause-msg">Waiting for players...</p>
+  <div class="waiting-pulse"><span></span><span></span><span></span></div>
+</div>
+
+<!-- Winner overlay -->
+<div class="winner-overlay" id="winner-overlay">
+  <div class="confetti-bg" id="confetti-bg"></div>
+  <div class="winner-crown">🏆</div>
+  <div class="winner-sub">WINNER</div>
+  <div class="winner-name" id="winner-name">---</div>
+  <div style="color:var(--muted);font-size:.85rem;" id="final-scores"></div>
+  <div class="game-summary" id="game-summary" style="display:none;">
+    <h3>ROUND HISTORY</h3>
+    <div id="summary-rows"></div>
+  </div>
+  <div style="display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;margin-top:.5rem;">
+    <button class="btn btn-primary btn-bungee" onclick="requestRematch()">⚡ REMATCH</button>
+    <button class="btn btn-ghost"              onclick="goHome()">🏠 HOME</button>
+  </div>
+</div>
+
+<!-- Round flash -->
+<div class="round-flash" id="round-flash"></div>
+
+<div class="toast" id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<script src="/static/shared.js"></script>
+<script>
+// ── Load state from sessionStorage (set by play.html or dashboard.html) ──
+let myRoom = sessionStorage.getItem('mb_room');
+let myName = sessionStorage.getItem('mb_name');
+let myTeam = parseInt(sessionStorage.getItem('mb_team') || '1');
+let myDiff = sessionStorage.getItem('mb_diff') || 'medium';
+let fromDash = new URLSearchParams(location.search).get('from') === 'dashboard';
+let initState = null;
+try { initState = JSON.parse(sessionStorage.getItem('mb_state')); } catch{}
+
+// If no room code → redirect back
+if (!myRoom || !myName) { window.location.href = fromDash ? '/dashboard' : '/play'; }
+
+let currentQuestion = null, answered = false;
+
+// ── Socket ──────────────────────────────────────────────────
+const socket = io({
+  transports:['polling','websocket'], upgrade:true,
+  reconnection:true, reconnectionAttempts:10, reconnectionDelay:1000, timeout:10000,
+});
+
+socket.on('connect', () => {
+  setDot('connected');
+  socket.emit('join_room', {room_code:myRoom, name:myName, team:myTeam});
+});
+socket.on('connect_error', () => setDot('disconnected'));
+socket.on('disconnect', reason => {
+  setDot('disconnected');
+  if (reason !== 'io client disconnect') showToast('Disconnected — reconnecting...','bad');
+});
+socket.on('reconnect', () => { setDot('connected'); showToast('Reconnected!','good'); });
+
+function setDot(s) {
+  const d = document.getElementById('conn-dot');
+  d.className = 'conn-dot ' + s;
+}
+
+// ── Socket events ────────────────────────────────────────────
+socket.on('joined', data => {
+  myTeam = data.team;
+  updateStatusBar();
+  if (data.state.active) applyState(data.state);
+  else showPause('Waiting for opponent to join...');
+});
+socket.on('team_switched', data => { myTeam=data.team; updateStatusBar(); showToast(data.message,'info'); });
+socket.on('player_joined', data => {
+  document.getElementById('player-count').textContent = `👥 ${data.player_count}`;
+  document.getElementById('t1-name').textContent = data.team1_name;
+  document.getElementById('t2-name').textContent = data.team2_name;
+  document.getElementById('pause-overlay').classList.remove('show');
+});
+socket.on('game_update',   state => applyState(state));
+socket.on('round_result',  onRoundResult);
+socket.on('new_question',  data => { setQuestion(data.question); answered=false; startTimer(data.timer||20); });
+socket.on('question_skipped', onSkip);
+socket.on('answer_result', data => { if (data.too_slow) showToast('⏱ Too slow!','bad'); else showToast('❌ Wrong!','bad'); });
+socket.on('game_paused', data => { stopTimer(); showPause(data.message); });
+socket.on('player_left',  data => showToast(`${data.name} left`,'info'));
+socket.on('error', data => showToast(data.message,'bad'));
+
+// ── Game UI ──────────────────────────────────────────────────
+function applyState(s) {
+  document.getElementById('pause-overlay').classList.remove('show');
+  myDiff = s.difficulty || 'medium';
+  document.getElementById('t1-name').textContent  = s.team1_name;
+  document.getElementById('t2-name').textContent  = s.team2_name;
+  document.getElementById('t1-score').textContent = s.team1_score;
+  document.getElementById('t2-score').textContent = s.team2_score;
+  document.getElementById('player-count').textContent = `👥 ${s.player_count}`;
+  const db = document.getElementById('diff-badge');
+  db.textContent = myDiff.toUpperCase(); db.className = `diff-badge ${myDiff}`;
+  updateRope(s.rope_position);
+  if (s.current_question?.question) {
+    setQuestion(s.current_question);
+    if (s.round_timer) startTimer(s.round_timer);
+  }
+  answered = false;
+}
+
+function updateStatusBar() {
+  document.getElementById('room-code-label').textContent = myRoom;
+  const badge = document.getElementById('my-badge');
+  badge.textContent = `YOU: ${myName}`;
+  badge.className   = `my-badge ${myTeam===1?'red':'blue'}`;
+}
+
+function setQuestion(q) {
+  currentQuestion = q; answered = false;
+  const el = document.getElementById('question-text');
+  el.style.animation='none'; void el.offsetWidth;
+  el.style.animation='qin .4s cubic-bezier(.34,1.56,.64,1)';
+  el.textContent = q.question;
+  const grid = document.getElementById('options-grid');
+  grid.classList.remove('options-locked'); grid.innerHTML='';
+  q.options.forEach(opt => {
+    const btn = document.createElement('button'); btn.className='opt';
+    btn.textContent=opt; btn.dataset.value=opt;
+    btn.onclick = () => submitAnswer(btn);
+    grid.appendChild(btn);
+  });
+}
+
+function submitAnswer(btn) {
+  if (answered) return; answered=true;
+  const val = parseInt(btn.dataset.value);
+  socket.emit('submit_answer',{room_code:myRoom, answer:val});
+  btn.classList.add(val===currentQuestion?.answer?'correct':'wrong');
+}
+
+function updateRope(pos) {
+  const pct = 50 + (pos/5)*40;
+  document.getElementById('knot').style.left = pct+'%';
+}
+
+function onRoundResult(data) {
+  const isMe = data.winner_team===myTeam;
+  // Flash
+  const fl = document.getElementById('round-flash');
+  fl.className = `round-flash ${data.winner_team===1?'red':'blue'} on`;
+  setTimeout(()=>fl.className='round-flash',400);
+
+  stopTimer();
+  updateRope(data.rope_position);
+  document.getElementById('t1-score').textContent = data.team1_score;
+  document.getElementById('t2-score').textContent = data.team2_score;
+
+  // Reveal correct answer in options
+  const grid = document.getElementById('options-grid');
+  grid.classList.add('options-locked');
+  Array.from(grid.children).forEach(b => {
+    if (parseInt(b.dataset.value)===data.correct_answer) b.classList.add('reveal');
+  });
+
+  showToast(isMe?`✅ You got it! +1 pull`:`❌ ${data.winner_name} got it first!`, isMe?'good':'bad');
+  if (data.history) updateHistory(data.history);
+  if (data.game_winner) setTimeout(()=>showWinner(data.game_winner, data.team1_score, data.team2_score, data.history), 1200);
+  else showSkipBar();
+}
+
+function onSkip(data) {
+  stopTimer();
+  const grid = document.getElementById('options-grid');
+  grid.classList.add('options-locked');
+  Array.from(grid.children).forEach(b => {
+    if (parseInt(b.dataset.value)===data.correct_answer) b.classList.add('reveal');
+  });
+  showToast(data.timeout?`⏱ Time's up! Answer: ${data.correct_answer}`:`😅 Both wrong! Answer: ${data.correct_answer}`,'info');
+  showSkipBar();
+}
+
+function startTimer(sec) {
+  stopTimer();
+  const f=document.getElementById('timer-fill');
+  f.style.setProperty('--dur',sec+'s');
+  f.className='timer-fill'; void f.offsetWidth;
+  f.className='timer-fill run';
+}
+function stopTimer() {
+  const f=document.getElementById('timer-fill');
+  f.className='timer-fill'; f.style.animation='none';
+}
+function showSkipBar() {
+  const bar=document.getElementById('skip-bar');
+  bar.classList.add('show');
+  setTimeout(()=>bar.classList.remove('show'),2100);
+}
+
+function updateHistory(history) {
+  const strip=document.getElementById('history-strip'); strip.innerHTML='';
+  history.slice().reverse().forEach(h => {
+    const chip=document.createElement('div');
+    chip.className=`h-chip t${h.team}`;
+    chip.textContent=`${h.solved_by}: ${h.question.replace(' = ?','')} = ${h.answer}`;
+    strip.appendChild(chip);
+  });
+}
+
+function showPause(msg) {
+  stopTimer();
+  document.getElementById('pause-msg').textContent = msg;
+  document.getElementById('pause-overlay').classList.add('show');
+}
+
+function showWinner(name, s1, s2, history) {
+  document.getElementById('winner-name').textContent  = name;
+  document.getElementById('final-scores').textContent = `${s1} — ${s2}`;
+  const summary=document.getElementById('game-summary'), rows=document.getElementById('summary-rows');
+  if (history?.length) {
+    summary.style.display='block'; rows.innerHTML='';
+    history.forEach(h => {
+      const row=document.createElement('div'); row.className='summary-row';
+      row.innerHTML=`<span class="summary-q">${h.question}</span><span class="summary-by t${h.team}">${h.solved_by}</span>`;
+      rows.appendChild(row);
+    });
+  }
+  document.getElementById('winner-overlay').classList.add('show');
+  spawnConfetti();
+}
+
+function spawnConfetti() {
+  const bg=document.getElementById('confetti-bg'); bg.innerHTML='';
+  const cols=['#ffe600','#ff2d55','#0af','#00ff88','#ff9500','#a855f7'];
+  for (let i=0;i<60;i++) {
+    const el=document.createElement('div'); el.className='confetti-p';
+    el.style.cssText=`left:${Math.random()*100}%;background:${cols[Math.floor(Math.random()*cols.length)]};animation-duration:${2+Math.random()*3}s;animation-delay:${Math.random()*2}s;width:${6+Math.random()*6}px;height:${6+Math.random()*6}px;border-radius:${Math.random()>.5?'50%':'2px'};`;
+    bg.appendChild(el);
+  }
+}
+
+function requestRematch() {
+  document.getElementById('winner-overlay').classList.remove('show');
+  document.getElementById('game-summary').style.display='none';
+  document.getElementById('history-strip').innerHTML='';
+  socket.emit('rematch',{room_code:myRoom});
+}
+
+function goHome() {
+  document.getElementById('winner-overlay').classList.remove('show');
+  sessionStorage.removeItem('mb_room'); sessionStorage.removeItem('mb_state');
+  stopTimer();
+  window.location.href = fromDash ? '/dashboard' : '/play';
+}
+
+// Init
+updateStatusBar();
+</script>
+</body>
+</html>

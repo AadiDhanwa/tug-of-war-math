@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>MathBattle — Real-time Math Duels for Classrooms</title>
+<link rel="stylesheet" href="/static/shared.css"/>
+<style>
+.hero-title{font-family:'Bungee Shade',cursive;font-size:clamp(2.5rem,10vw,6rem);background:linear-gradient(135deg,var(--red),var(--yellow),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 30px rgba(255,230,0,.25));line-height:1.1;}
+.hero-sub{font-size:clamp(.9rem,2vw,1.1rem);color:var(--muted);max-width:500px;line-height:1.6;}
+.hero-btns{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;}
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;max-width:800px;width:100%;}
+.feature-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem;}
+.feature-card .icon{font-size:1.8rem;margin-bottom:.5rem;}
+.feature-card h3{font-size:.9rem;font-weight:600;margin-bottom:.25rem;}
+.feature-card p{font-size:.75rem;color:var(--muted);line-height:1.5;}
+.pricing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;max-width:700px;width:100%;}
+.plan-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;text-align:center;position:relative;overflow:hidden;}
+.plan-card.featured{border-color:var(--yellow);}
+.plan-card.featured::before{content:'POPULAR';position:absolute;top:0;right:0;background:var(--yellow);color:#000;font-size:.6rem;font-weight:700;padding:.25rem .75rem;border-bottom-left-radius:8px;font-family:'Bungee',cursive;}
+.plan-name{font-family:'Bungee',cursive;font-size:1rem;margin-bottom:.5rem;}
+.plan-price{font-size:1.8rem;font-weight:700;color:var(--yellow);margin-bottom:.25rem;}
+.plan-price span{font-size:.8rem;color:var(--muted);font-weight:400;}
+.plan-features{list-style:none;margin:.75rem 0;font-size:.75rem;color:var(--muted);text-align:left;}
+.plan-features li{padding:.2rem 0;}
+.plan-features li::before{content:'✓ ';color:var(--green);}
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- Navbar -->
+  <nav class="topbar">
+    <span class="topbar-logo">⚡ MATHBATTLE</span>
+    <div class="topbar-right">
+      <a href="/login" class="btn btn-ghost btn-sm">Log In</a>
+      <a href="/login#register" class="btn btn-primary btn-sm btn-bungee">Sign Up Free</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <div style="display:flex;flex-direction:column;align-items:center;padding:4rem 1.5rem 2rem;gap:2rem;text-align:center;">
+    <div>
+      <div class="hero-title">MATHBATTLE</div>
+      <p style="margin-top:.75rem;" class="hero-sub">Real-time 2-player math duels for classrooms.<br>Make learning addictive.</p>
+    </div>
+    <div class="hero-btns">
+      <a href="/login#register" class="btn btn-primary btn-bungee" style="font-size:1rem;padding:.9rem 2rem;">🏫 For Teachers — Free</a>
+      <a href="/play" class="btn btn-ghost btn-bungee" style="font-size:1rem;padding:.9rem 2rem;">⚡ Quick Play</a>
+    </div>
+
+    <!-- Features -->
+    <div style="width:100%;max-width:800px;">
+      <div class="section-label" style="margin-bottom:1rem;">Why Teachers Love It</div>
+      <div class="feature-grid">
+        <div class="feature-card"><div class="icon">🎮</div><h3>Addictive Game Format</h3><p>Students beg to play. Tug-of-war mechanic makes math feel like a sport.</p></div>
+        <div class="feature-card"><div class="icon">📊</div><h3>Real Analytics</h3><p>Track every student's accuracy, speed, and progress over time.</p></div>
+        <div class="feature-card"><div class="icon">🏫</div><h3>CBSE Aligned</h3><p>Grade 3–8 difficulty levels mapped to curriculum.</p></div>
+        <div class="feature-card"><div class="icon">📱</div><h3>Works on Any Device</h3><p>Mobile, tablet, laptop — no app install needed. Just a browser.</p></div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div style="width:100%;max-width:700px;">
+      <div class="section-label" style="margin-bottom:1rem;">Simple Pricing</div>
+      <div class="pricing-grid">
+        <div class="plan-card">
+          <div class="plan-name">FREE</div>
+          <div class="plan-price">₹0 <span>/mo</span></div>
+          <ul class="plan-features"><li>1 teacher account</li><li>30 students</li><li>Basic analytics</li></ul>
+          <a href="/login#register" class="btn btn-ghost btn-full btn-sm">Get Started</a>
+        </div>
+        <div class="plan-card featured">
+          <div class="plan-name">BASIC</div>
+          <div class="plan-price">₹999 <span>/mo</span></div>
+          <ul class="plan-features"><li>5 teacher accounts</li><li>Unlimited students</li><li>Full analytics</li><li>Leaderboards</li></ul>
+          <a href="/login#register" class="btn btn-primary btn-full btn-sm btn-bungee">Start Free Trial</a>
+        </div>
+        <div class="plan-card">
+          <div class="plan-name">PRO</div>
+          <div class="plan-price">₹2499 <span>/mo</span></div>
+          <ul class="plan-features"><li>Unlimited teachers</li><li>Unlimited students</li><li>Export reports</li><li>Priority support</li></ul>
+          <a href="/login#register" class="btn btn-ghost btn-full btn-sm">Contact Us</a>
+        </div>
+      </div>
+    </div>
+
+    <p style="color:var(--muted);font-size:.75rem;margin-top:.5rem;">
+      Already have an account? <a href="/login" style="color:var(--yellow);text-decoration:none;">Log in →</a>
+    </p>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/static/shared.js"></script>
+<script>
+  // If already logged in, redirect to dashboard
+  (async () => {
+    const user = await MB.verifyAuth();
+    if (user && user.role === 'teacher') window.location.href = '/dashboard';
+  })();
+</script>
+</body>
+</html>

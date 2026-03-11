@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Login — MathBattle</title>
+<link rel="stylesheet" href="/static/shared.css"/>
+<style>
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem;}
+.auth-box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:2rem;width:100%;max-width:420px;}
+.auth-tabs{display:flex;gap:0;margin-bottom:1.5rem;background:rgba(255,255,255,.04);border-radius:10px;padding:4px;}
+.auth-tab{flex:1;padding:.5rem;border:none;background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:.85rem;cursor:pointer;border-radius:7px;transition:all .2s;}
+.auth-tab.active{background:var(--card2);color:#fff;font-weight:600;}
+.role-selector{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;}
+.role-btn{padding:.65rem;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:.8rem;cursor:pointer;transition:all .2s;text-align:center;}
+.role-btn.active{background:rgba(255,230,0,.1);border-color:var(--yellow);color:var(--yellow);}
+.role-icon{font-size:1.2rem;display:block;margin-bottom:.25rem;}
+</style>
+</head>
+<body>
+<div class="page" style="width:100%;">
+<div class="auth-box">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+    <a href="/" class="topbar-logo" style="font-size:1rem;">⚡ MATHBATTLE</a>
+    <a href="/" class="btn btn-ghost btn-sm">← Back</a>
+  </div>
+
+  <div class="auth-tabs">
+    <button class="auth-tab active" id="tab-login"    onclick="switchTab('login')">Log In</button>
+    <button class="auth-tab"        id="tab-register" onclick="switchTab('register')">Sign Up</button>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="form-login">
+    <div class="form-grid">
+      <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@school.com" autocomplete="email"/></div>
+      <div class="field"><label>Password</label><input type="password" id="login-password" placeholder="••••••••"/></div>
+      <button class="btn btn-primary btn-full btn-bungee" onclick="doLogin()">LOG IN</button>
+      <div style="text-align:center;font-size:.75rem;color:var(--muted);">
+        No account? <a href="#" onclick="switchTab('register')" style="color:var(--yellow);text-decoration:none;">Sign up free →</a>
+      </div>
+      <div class="divider"></div>
+      <a href="/play" class="btn btn-ghost btn-full btn-sm" style="text-align:center;">⚡ Quick Play (no account needed)</a>
+    </div>
+  </div>
+
+  <!-- REGISTER -->
+  <div id="form-register" style="display:none;">
+    <div class="form-grid">
+      <div class="role-selector">
+        <button class="role-btn active" id="role-teacher" onclick="selectRole('teacher')">
+          <span class="role-icon">👩‍🏫</span>I'm a Teacher
+        </button>
+        <button class="role-btn" id="role-student" onclick="selectRole('student')">
+          <span class="role-icon">🎒</span>I'm a Student
+        </button>
+      </div>
+      <div class="field"><label>Full Name</label><input type="text" id="reg-name" placeholder="Your name"/></div>
+      <div class="field"><label>Email</label><input type="email" id="reg-email" placeholder="you@school.com" autocomplete="email"/></div>
+      <div class="field" id="school-field"><label>School Name</label><input type="text" id="reg-school" placeholder="e.g. Delhi Public School"/></div>
+      <div class="field"><label>Password</label><input type="password" id="reg-password" placeholder="Min 6 characters"/></div>
+      <button class="btn btn-primary btn-full btn-bungee" onclick="doRegister()">CREATE ACCOUNT</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/shared.js"></script>
+<script>
+let regRole = 'teacher';
+
+// Check hash for deep link e.g. /login#register
+if (location.hash === '#register') switchTab('register');
+
+// If already logged in → redirect
+(async () => {
+  const user = await MB.verifyAuth();
+  if (user) { window.location.href = user.role === 'teacher' ? '/dashboard' : '/play'; }
+})();
+
+function switchTab(tab) {
+  document.getElementById('tab-login').classList.toggle('active', tab==='login');
+  document.getElementById('tab-register').classList.toggle('active', tab==='register');
+  document.getElementById('form-login').style.display    = tab==='login'    ? 'block' : 'none';
+  document.getElementById('form-register').style.display = tab==='register' ? 'block' : 'none';
+  history.replaceState(null,'', tab==='register' ? '#register' : '#');
+}
+
+function selectRole(r) {
+  regRole = r;
+  document.getElementById('role-teacher').classList.toggle('active', r==='teacher');
+  document.getElementById('role-student').classList.toggle('active', r==='student');
+  document.getElementById('school-field').style.display = r==='teacher' ? 'flex' : 'none';
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pw    = document.getElementById('login-password').value;
+  if (!email || !pw) { showToast('Fill all fields!','bad'); return; }
+  const res  = await MB.fetch('/api/auth/login', {method:'POST', body:{email, password:pw}});
+  const data = await res.json();
+  if (data.error) { showToast(data.error,'bad'); return; }
+  MB.saveAuth(data.token, data.user);
+  window.location.href = data.user.role === 'teacher' ? '/dashboard' : '/play';
+}
+
+async function doRegister() {
+  const name   = document.getElementById('reg-name').value.trim();
+  const email  = document.getElementById('reg-email').value.trim();
+  const pw     = document.getElementById('reg-password').value;
+  const school = document.getElementById('reg-school')?.value.trim() || '';
+  if (!name || !email || !pw) { showToast('Fill all fields!','bad'); return; }
+  const res  = await MB.fetch('/api/auth/register', {method:'POST', body:{name, email, password:pw, role:regRole, school}});
+  const data = await res.json();
+  if (data.error) { showToast(data.error,'bad'); return; }
+  MB.saveAuth(data.token, data.user);
+  window.location.href = data.user.role === 'teacher' ? '/dashboard' : '/play';
+}
+</script>
+</body>
+</html>

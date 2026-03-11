@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Dashboard — MathBattle</title>
+<link rel="stylesheet" href="/static/shared.css"/>
+<style>
+.dashboard-body{padding:1.5rem;max-width:1100px;margin:0 auto;}
+.dash-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;}
+.dash-header h1{font-family:'Bungee',cursive;font-size:1.4rem;}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;margin-bottom:1.5rem;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem;}
+.stat-val{font-family:'Bungee',cursive;font-size:1.8rem;line-height:1;}
+.stat-lbl{font-size:.7rem;color:var(--muted);margin-top:.3rem;letter-spacing:.05em;}
+.classes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;margin-bottom:1.5rem;}
+.class-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.25rem;cursor:pointer;transition:border-color .2s,transform .2s;}
+.class-card:hover{border-color:rgba(255,255,255,.2);transform:translateY(-2px);}
+.class-name{font-weight:700;font-size:1rem;margin-bottom:.2rem;}
+.class-meta{font-size:.72rem;color:var(--muted);}
+.class-code-badge{font-family:'Bungee',cursive;font-size:.8rem;color:var(--yellow);background:rgba(255,230,0,.08);border:1px solid rgba(255,230,0,.2);padding:.2rem .6rem;border-radius:6px;white-space:nowrap;}
+.class-stats-row{display:flex;gap:1rem;font-size:.72rem;color:var(--muted);margin-top:.75rem;flex-wrap:wrap;}
+.plan-banner{background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(0,170,255,.1));border:1px solid rgba(168,85,247,.3);border-radius:14px;padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem;}
+.plan-banner p{font-size:.8rem;color:var(--muted);}
+.user-pill{display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:var(--muted);}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--red),var(--blue));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.75rem;color:#fff;}
+
+/* Class detail panel */
+.class-detail{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;margin-bottom:1.5rem;display:none;}
+.class-detail.open{display:block;}
+.class-detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.75rem;}
+.class-detail-header h2{font-family:'Bungee',cursive;font-size:1.2rem;}
+.lb-table{width:100%;border-collapse:collapse;font-size:.8rem;}
+.lb-table th{text-align:left;padding:.5rem .75rem;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);}
+.lb-table td{padding:.55rem .75rem;border-bottom:1px solid rgba(255,255,255,.04);}
+.lb-table tr:hover td{background:rgba(255,255,255,.02);}
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:.7rem;font-weight:700;}
+.rank-1{background:rgba(255,230,0,.2);color:var(--yellow);}
+.rank-2{background:rgba(192,192,192,.15);color:#ccc;}
+.rank-3{background:rgba(205,127,50,.15);color:#cd7f32;}
+.acc-bar{height:4px;background:rgba(255,255,255,.08);border-radius:2px;width:70px;display:inline-block;vertical-align:middle;overflow:hidden;}
+.acc-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--green),var(--yellow));}
+
+/* Plan cards in modal */
+.pricing-mini{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem;}
+.plan-mini{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:1rem;text-align:center;}
+.plan-mini.featured{border-color:var(--yellow);}
+.plan-mini-name{font-family:'Bungee',cursive;font-size:.85rem;margin-bottom:.25rem;}
+.plan-mini-price{font-size:1.4rem;font-weight:700;color:var(--yellow);}
+.plan-mini-price span{font-size:.7rem;color:var(--muted);font-weight:400;}
+.plan-mini ul{list-style:none;font-size:.68rem;color:var(--muted);text-align:left;margin:.5rem 0;}
+.plan-mini ul li::before{content:'✓ ';color:var(--green);}
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- Topbar -->
+  <nav class="topbar">
+    <span class="topbar-logo">⚡ MATHBATTLE</span>
+    <div class="topbar-right">
+      <div class="user-pill">
+        <div class="avatar" id="dash-avatar">T</div>
+        <span id="dash-username">Teacher</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="MB.logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="dashboard-body">
+    <!-- Plan Banner -->
+    <div class="plan-banner" id="plan-banner">
+      <div>
+        <strong id="plan-label">Free Plan</strong>
+        <p id="plan-desc">1 class · 30 students. Upgrade to unlock more.</p>
+      </div>
+      <button class="btn btn-primary btn-sm btn-bungee" onclick="openModal('modal-upgrade')">⬆ Upgrade</button>
+    </div>
+
+    <!-- Header -->
+    <div class="dash-header">
+      <h1>My Classes</h1>
+      <button class="btn btn-primary btn-bungee" onclick="openModal('modal-create-class')">+ New Class</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-val" id="stat-classes">0</div><div class="stat-lbl">CLASSES</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat-students">0</div><div class="stat-lbl">STUDENTS</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat-rounds">0</div><div class="stat-lbl">ROUNDS PLAYED</div></div>
+    </div>
+
+    <!-- Classes Grid -->
+    <div class="classes-grid" id="classes-grid">
+      <div style="color:var(--muted);font-size:.85rem;padding:2rem;text-align:center;grid-column:1/-1;">Loading...</div>
+    </div>
+
+    <!-- Class Detail Panel -->
+    <div class="class-detail" id="class-detail">
+      <div class="class-detail-header">
+        <h2 id="detail-name">Class</h2>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm btn-bungee" onclick="startClassGame()">▶ Start Game</button>
+          <button class="btn btn-ghost btn-sm" onclick="copyClassCode()">📋 Copy Code</button>
+          <button class="btn btn-red btn-sm" onclick="deleteClass()">🗑 Delete</button>
+          <button class="btn btn-ghost btn-sm" onclick="closeDetail()">✕</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin-bottom:1rem;">
+        <span>Code: <strong id="detail-code" style="color:var(--yellow);font-family:'Bungee',cursive;letter-spacing:.1em;"></strong></span>
+        <span id="detail-grade"></span>
+        <span id="detail-diff"></span>
+        <span id="detail-count"></span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="lb-table">
+          <thead><tr><th>#</th><th>Student</th><th>Correct</th><th>Wrong</th><th>Accuracy</th><th>Games</th><th>Last Seen</th></tr></thead>
+          <tbody id="lb-body">
+            <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:1.5rem;font-size:.8rem;">No students yet. Share the class code!</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Class Modal -->
+<div class="modal-backdrop" id="modal-create-class">
+  <div class="modal">
+    <h3>New Class</h3>
+    <div class="form-grid">
+      <div class="field"><label>Class Name</label><input type="text" id="new-class-name" placeholder="e.g. Class 6 — Maths A"/></div>
+      <div class="field"><label>Grade</label>
+        <select id="new-class-grade">
+          <option value="grade3">Grade 3</option><option value="grade4">Grade 4</option>
+          <option value="grade5" selected>Grade 5</option><option value="grade6">Grade 6</option>
+          <option value="grade7">Grade 7</option><option value="grade8">Grade 8</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:.75rem;">
+        <button class="btn btn-primary btn-full btn-bungee" onclick="doCreateClass()">CREATE</button>
+        <button class="btn btn-ghost" onclick="closeModal('modal-create-class')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Upgrade Modal -->
+<div class="modal-backdrop" id="modal-upgrade">
+  <div class="modal">
+    <h3>Upgrade Plan</h3>
+    <div class="pricing-mini">
+      <div class="plan-mini">
+        <div class="plan-mini-name">BASIC</div>
+        <div class="plan-mini-price">₹999 <span>/mo</span></div>
+        <ul><li>5 teachers</li><li>Unlimited students</li><li>Full analytics</li></ul>
+        <button class="btn btn-primary btn-full btn-sm btn-bungee" onclick="doUpgrade('basic')">SELECT</button>
+      </div>
+      <div class="plan-mini featured">
+        <div class="plan-mini-name">PRO</div>
+        <div class="plan-mini-price">₹2499 <span>/mo</span></div>
+        <ul><li>Unlimited teachers</li><li>Export reports</li><li>Priority support</li></ul>
+        <button class="btn btn-primary btn-full btn-sm btn-bungee" onclick="doUpgrade('pro')">SELECT</button>
+      </div>
+    </div>
+    <button class="btn btn-ghost btn-full btn-sm" onclick="closeModal('modal-upgrade')">Cancel</button>
+    <p style="font-size:.7rem;color:var(--muted);text-align:center;margin-top:.5rem;">Payment via Razorpay (demo mode)</p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/shared.js"></script>
+<script>
+let selectedClass = null;
+
+// Auth guard
+(async () => {
+  const user = await MB.verifyAuth();
+  if (!user) { window.location.href = '/login'; return; }
+  if (user.role !== 'teacher') { window.location.href = '/play'; return; }
+  document.getElementById('dash-username').textContent = user.name;
+  document.getElementById('dash-avatar').textContent   = user.name[0].toUpperCase();
+  const planLabels = {free:'Free Plan',basic:'Basic Plan',pro:'Pro Plan'};
+  const planDescs  = {free:'1 class · 30 students. Upgrade to unlock more.',basic:'5 teachers · Unlimited students.',pro:'Unlimited everything.'};
+  document.getElementById('plan-label').textContent = planLabels[user.plan||'free'];
+  document.getElementById('plan-desc').textContent  = planDescs[user.plan||'free'];
+  loadClasses();
+})();
+
+async function loadClasses() {
+  const res  = await MB.fetch('/api/classes');
+  const data = await res.json();
+  renderClasses(data.classes || []);
+}
+
+function renderClasses(list) {
+  let students=0, rounds=0;
+  const grid = document.getElementById('classes-grid');
+  if (!list.length) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:2rem;text-align:center;grid-column:1/-1;">No classes yet. Create your first class! 🏫</div>';
+  } else {
+    grid.innerHTML = '';
+    list.forEach(cls => {
+      const sc = Object.keys(cls.student_stats||{}).length;
+      students += sc; rounds += cls.total_rounds||0;
+      const card = document.createElement('div'); card.className='class-card';
+      card.onclick = () => openDetail(cls.code);
+      card.innerHTML = `
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.5rem;">
+          <div>
+            <div class="class-name">${cls.name}</div>
+            <div class="class-meta">${cls.school||''} · ${cls.grade?.replace('grade','Grade ')||''}</div>
+          </div>
+          <span class="class-code-badge">${cls.code}</span>
+        </div>
+        <div class="class-stats-row">
+          <span>👥 ${sc} students</span>
+          <span>⚡ ${cls.total_rounds||0} rounds</span>
+          <span class="diff-pill ${cls.difficulty}">${(cls.difficulty||'medium').toUpperCase()}</span>
+        </div>`;
+      grid.appendChild(card);
+    });
+  }
+  document.getElementById('stat-classes').textContent  = list.length;
+  document.getElementById('stat-students').textContent = students;
+  document.getElementById('stat-rounds').textContent   = rounds;
+}
+
+async function openDetail(code) {
+  selectedClass = code;
+  const res  = await MB.fetch(`/api/classes/${code}`);
+  const data = await res.json();
+  if (data.error) { showToast(data.error,'bad'); return; }
+  const cls=data.class, lb=data.leaderboard||[];
+  document.getElementById('detail-name').textContent  = cls.name;
+  document.getElementById('detail-code').textContent  = cls.code;
+  document.getElementById('detail-grade').textContent = cls.grade?.replace('grade','Grade ')||'';
+  document.getElementById('detail-diff').innerHTML    = `<span class="diff-pill ${cls.difficulty}">${(cls.difficulty||'medium').toUpperCase()}</span>`;
+  document.getElementById('detail-count').textContent = `👥 ${lb.length} students`;
+  const tbody = document.getElementById('lb-body');
+  if (!lb.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:1.5rem;font-size:.8rem;">No students yet. Share the class code!</td></tr>';
+  } else {
+    tbody.innerHTML = lb.map((s,i) => {
+      const total=s.correct+s.wrong, acc=total>0?Math.round(s.correct/total*100):0;
+      const rc=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'';
+      const em=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+      return `<tr>
+        <td><span class="rank-badge ${rc}">${em||i+1}</span></td>
+        <td style="font-weight:600;">${s.name}</td>
+        <td style="color:var(--green);font-weight:700;">${s.correct}</td>
+        <td style="color:var(--red);">${s.wrong}</td>
+        <td><span class="acc-bar"><span class="acc-fill" style="width:${acc}%"></span></span> <span style="font-size:.72rem;color:var(--muted);">${acc}%</span></td>
+        <td style="color:var(--muted);">${s.games}</td>
+        <td style="color:var(--muted);font-size:.72rem;">${s.last_seen||'—'}</td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('class-detail').classList.add('open');
+  document.getElementById('class-detail').scrollIntoView({behavior:'smooth'});
+}
+
+function closeDetail() {
+  document.getElementById('class-detail').classList.remove('open');
+  selectedClass = null;
+}
+
+function copyClassCode() {
+  if (selectedClass) copyToClipboard(selectedClass, 'Class code copied!');
+}
+
+async function deleteClass() {
+  if (!selectedClass || !confirm('Delete this class? All student data will be lost.')) return;
+  await MB.fetch(`/api/classes/${selectedClass}`,{method:'DELETE'});
+  closeDetail(); loadClasses(); showToast('Class deleted','info');
+}
+
+async function startClassGame() {
+  if (!selectedClass) return;
+  const res  = await MB.fetch('/api/create_room',{method:'POST',body:{class_code:selectedClass}});
+  const data = await res.json();
+  if (data.error) { showToast(data.error,'bad'); return; }
+  // Save game params to sessionStorage, then go to play page to socket-connect
+  sessionStorage.setItem('mb_room',  data.room_code);
+  sessionStorage.setItem('mb_name',  MB.user.name+' (Teacher)');
+  sessionStorage.setItem('mb_team',  '1');
+  sessionStorage.setItem('mb_diff',  data.difficulty);
+  sessionStorage.setItem('mb_class', selectedClass);
+  window.location.href = '/game?from=dashboard&room='+data.room_code;
+}
+
+async function doCreateClass() {
+  const name  = document.getElementById('new-class-name').value.trim();
+  const grade = document.getElementById('new-class-grade').value;
+  if (!name) { showToast('Enter class name!','bad'); return; }
+  const res  = await MB.fetch('/api/classes',{method:'POST',body:{name,grade}});
+  const data = await res.json();
+  if (data.error) { showToast(data.error,'bad'); return; }
+  closeModal('modal-create-class');
+  document.getElementById('new-class-name').value = '';
+  loadClasses();
+  showToast(`Class "${name}" created! Code: ${data.class.code}`,'good');
+}
+
+async function doUpgrade(plan) {
+  const res  = await MB.fetch('/api/subscription/upgrade',{method:'POST',body:{plan}});
+  const data = await res.json();
+  if (data.error) { showToast(data.error,'bad'); return; }
+  closeModal('modal-upgrade');
+  showToast(`Upgraded to ${plan.toUpperCase()}!`,'good');
+  location.reload();
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+</script>
+</body>
+</html>

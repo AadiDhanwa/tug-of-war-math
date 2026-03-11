@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/>
+<title>Quick Play — MathBattle</title>
+<link rel="stylesheet" href="/static/shared.css"/>
+<style>
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem;}
+.play-box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:2rem;width:100%;max-width:680px;}
+.logo h1{font-family:'Bungee Shade',cursive;font-size:clamp(1.8rem,6vw,3rem);background:linear-gradient(135deg,var(--red),var(--yellow),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.lobby-cards{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+@media(max-width:540px){.lobby-cards{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="page" style="width:100%;">
+<div class="play-box">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
+    <a href="/" class="btn btn-ghost btn-sm">← Back</a>
+    <a href="/login" class="btn btn-ghost btn-sm">🏫 Teacher Login</a>
+  </div>
+
+  <div style="text-align:center;margin-bottom:1.5rem;" class="logo">
+    <h1>TUG OF WAR</h1>
+    <p style="font-size:.7rem;letter-spacing:.3em;color:var(--muted);margin-top:.25rem;">⚡ MATH BATTLE ⚡</p>
+  </div>
+
+  <!-- Lobby: Create + Join -->
+  <div id="lobby-main">
+    <div class="lobby-cards">
+      <div class="card-inner card-red">
+        <h3>🔴 Create Room</h3>
+        <div class="field"><label>Your Name</label>
+          <input type="text" id="create-name" placeholder="Enter name" maxlength="16" autocomplete="off"/>
+        </div>
+        <div class="field"><label>Difficulty</label>
+          <div class="diff-selector">
+            <button class="diff-btn"              id="diff-easy"   onclick="selectDiff('easy')">🟢 Easy</button>
+            <button class="diff-btn active-medium" id="diff-medium" onclick="selectDiff('medium')">🟡 Medium</button>
+            <button class="diff-btn"              id="diff-hard"   onclick="selectDiff('hard')">🔴 Hard</button>
+          </div>
+        </div>
+        <div class="field"><label>Your Team</label>
+          <div class="team-selector">
+            <button class="team-btn active-red" id="team-1" onclick="selectTeam(1)">🔴 Team 1</button>
+            <button class="team-btn"            id="team-2" onclick="selectTeam(2)">🔵 Team 2</button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full btn-bungee" onclick="createRoom()">CREATE ROOM</button>
+      </div>
+
+      <div class="card-inner card-blue">
+        <h3>🔵 Join Room</h3>
+        <div class="field"><label>Your Name</label>
+          <input type="text" id="join-name" placeholder="Enter name" maxlength="16" autocomplete="off"/>
+        </div>
+        <div class="field"><label>Room Code</label>
+          <input type="text" id="join-code" placeholder="e.g. AB12CD" maxlength="6"
+            style="text-transform:uppercase;letter-spacing:.2em;font-family:'Bungee',cursive;"
+            autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"/>
+        </div>
+        <div class="field"><label>Your Team</label>
+          <div class="team-selector">
+            <button class="team-btn"             id="join-team-1" onclick="selectJoinTeam(1)">🔴 Team 1</button>
+            <button class="team-btn active-blue" id="join-team-2" onclick="selectJoinTeam(2)">🔵 Team 2</button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full btn-bungee" onclick="joinRoom()">JOIN ROOM</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Waiting state (shown after creating room) -->
+  <div id="lobby-waiting" style="display:none;text-align:center;">
+    <div class="room-code-display" id="display-code" onclick="copyToClipboard(myRoom,'Room code copied!')">------</div>
+    <div style="font-size:.65rem;color:var(--muted);margin:.5rem 0;">TAP CODE TO COPY · SHARE WITH OPPONENT</div>
+    <div class="share-row" style="justify-content:center;max-width:280px;margin:0 auto 1.5rem;">
+      <button class="btn btn-ghost btn-sm" onclick="copyToClipboard(myRoom,'Copied!')">📋 Copy</button>
+      <button class="btn btn-ghost btn-sm" onclick="shareOrCopy('Join my Math Battle! Code: '+myRoom+'\n'+location.origin+'/play')">📤 Share</button>
+    </div>
+    <div class="waiting-pulse" style="justify-content:center;"><span></span><span></span><span></span></div>
+    <p style="font-size:.8rem;color:var(--muted);margin-top:.75rem;" id="waiting-status">Waiting for opponent...</p>
+    <button class="btn btn-ghost btn-sm" style="margin-top:1rem;" onclick="cancelWait()">✕ Cancel</button>
+  </div>
+
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<script src="/static/shared.js"></script>
+<script>
+let myRoom=null, myName=null, myTeam=1, joinTeam=2, myDiff='medium';
+
+const socket = io({
+  transports:['polling','websocket'], upgrade:true,
+  reconnection:true, reconnectionAttempts:10, reconnectionDelay:1000, timeout:10000,
+});
+
+socket.on('connect', () => {
+  if (myRoom && myName) socket.emit('join_room',{room_code:myRoom,name:myName,team:myTeam});
+});
+socket.on('connect_error', () => showToast('Connection failed!','bad'));
+
+// Joined → save state and go to game
+socket.on('joined', data => {
+  myRoom = data.room_code; myTeam = data.team;
+  sessionStorage.setItem('mb_room', myRoom);
+  sessionStorage.setItem('mb_name', myName);
+  sessionStorage.setItem('mb_team', myTeam);
+  sessionStorage.setItem('mb_diff', data.state.difficulty || myDiff);
+  sessionStorage.setItem('mb_state', JSON.stringify(data.state));
+  if (data.state.active) {
+    window.location.href = '/game';
+  } else {
+    showWaiting();
+  }
+});
+
+socket.on('player_joined', data => {
+  const s = document.getElementById('waiting-status');
+  if (s) s.textContent = `${data.player_count}/2 players — ${data.team1_name} vs ${data.team2_name}`;
+  if (data.player_count >= 2) {
+    showToast('Game starting!','good');
+  }
+});
+
+socket.on('game_update', state => {
+  sessionStorage.setItem('mb_state', JSON.stringify(state));
+  window.location.href = '/game';
+});
+
+socket.on('error', data => showToast(data.message,'bad'));
+socket.on('team_switched', data => { myTeam = data.team; showToast(`ℹ️ ${data.message}`,'info'); });
+
+// Selectors
+function selectTeam(t) {
+  myTeam = t;
+  document.getElementById('team-1').className = 'team-btn'+(t===1?' active-red':'');
+  document.getElementById('team-2').className = 'team-btn'+(t===2?' active-blue':'');
+}
+function selectJoinTeam(t) {
+  joinTeam = t;
+  document.getElementById('join-team-1').className = 'team-btn'+(t===1?' active-red':'');
+  document.getElementById('join-team-2').className = 'team-btn'+(t===2?' active-blue':'');
+}
+function selectDiff(d) {
+  myDiff = d;
+  ['easy','medium','hard'].forEach(x => {
+    document.getElementById('diff-'+x).className = 'diff-btn'+(x===d?' active-'+x:'');
+  });
+}
+
+async function createRoom() {
+  const name = document.getElementById('create-name').value.trim();
+  if (!name) { showToast('Enter your name!','bad'); return; }
+  myName = name;
+  const res  = await MB.fetch('/api/create_room',{method:'POST',body:{difficulty:myDiff}});
+  const data = await res.json();
+  if (data.error) { showToast(data.error,'bad'); return; }
+  myRoom = data.room_code;
+  socket.emit('join_room',{room_code:myRoom,name,team:myTeam});
+}
+
+async function joinRoom() {
+  const name = document.getElementById('join-name').value.trim();
+  const code = document.getElementById('join-code').value.trim().toUpperCase();
+  if (!name) { showToast('Enter your name!','bad'); return; }
+  if (!code || code.length!==6) { showToast('Enter valid 6-char code!','bad'); return; }
+  const res  = await MB.fetch(`/api/room/${code}`);
+  const data = await res.json();
+  if (!res.ok || data.error) { showToast(data.error||'Room not found!','bad'); return; }
+  if (data.full) { showToast('Room is full!','bad'); return; }
+  myName = name; myTeam = joinTeam; myRoom = code;
+  socket.emit('join_room',{room_code:code,name,team:joinTeam});
+}
+
+function showWaiting() {
+  document.getElementById('lobby-main').style.display    = 'none';
+  document.getElementById('lobby-waiting').style.display = 'block';
+  document.getElementById('display-code').textContent    = myRoom;
+}
+
+function cancelWait() {
+  myRoom = null; myName = null;
+  document.getElementById('lobby-main').style.display    = 'block';
+  document.getElementById('lobby-waiting').style.display = 'none';
+  socket.disconnect(); socket.connect();
+}
+
+// Pre-fill name if logged in
+if (MB.user) document.getElementById('create-name').value = MB.user.name;
+// Check for room code in URL ?join=XXXX
+const urlCode = new URLSearchParams(location.search).get('join');
+if (urlCode) {
+  document.getElementById('join-code').value = urlCode.toUpperCase();
+  document.getElementById('join-name').focus();
+}
+</script>
+</body>
+</html>
